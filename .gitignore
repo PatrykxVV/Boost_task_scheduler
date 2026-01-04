@@ -1,0 +1,5 @@
+
+## Executable and build, we dont want this
+/build
+*.o
+*.exe
