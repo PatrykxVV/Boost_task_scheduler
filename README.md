@@ -38,3 +38,7 @@ To dokładnie ten model, na którym bazują m.in. gRPC, ROS2 i systemy low-laten
 
 ## Struktura projektu
 
+src/
+├── main.cpp # przykładowe użycie
+├── task_scheduler.hpp # publiczny interfejs
+└── task_scheduler.cpp # implementacja
