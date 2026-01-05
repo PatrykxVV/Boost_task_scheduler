@@ -3,3 +3,7 @@
 /build
 *.o
 *.exe
+## Docker also
+**/docker-data/
+**/data/
+*.log
