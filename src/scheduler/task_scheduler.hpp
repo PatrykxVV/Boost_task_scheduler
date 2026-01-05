@@ -2,28 +2,33 @@
 
 #include <boost/asio.hpp>
 #include <functional>
-#include <chrono>
-#include <memory>
+#include <atomic>
+#include <vector>
+#include <thread>
 
-class TaskScheduler{
-    public:
-        explicit TaskScheduler(std::size_t thread_count);
-        ~TaskScheduler();
+// Prosty scheduler tasków z limitem równoległości
+class TaskScheduler {
+public:
+    // threads – liczba wątków roboczych
+    // max_tasks – ile tasków max może być wykonywanych naraz
+    TaskScheduler(std::size_t threads, std::size_t max_tasks);
+    ~TaskScheduler();
 
-        // Zadanie do wykonania ,,jak najszybciej''
-        void submit(std::function<void()> task);
+    // Próbuje dodać task (z backpressure)
+    bool try_submit(std::function<void()> task);
 
-        // Zadanie do wykonania po czasie
-        void schedule_after(std::chrono::milliseconds delay,
-                            std::function<void()> task);
+    // Ile tasków aktualnie „w locie”
+    std::size_t in_flight() const;
 
+private:
+    boost::asio::io_context io_;
 
-        void wait();
-        
-    private:
-            boost::asio::io_context io_;
-            boost::asio::executor_work_guard<
-                boost::asio::io_context::executor_type> work_guard_;
+    // Zapobiega zakończeniu io_context gdy chwilowo brak tasków
+    boost::asio::executor_work_guard<
+        boost::asio::io_context::executor_type> work_guard_;
 
-        std::vector<std::thread> threads_;
+    std::vector<std::thread> threads_;
+
+    const std::size_t max_tasks_;
+    std::atomic<std::size_t> in_flight_;
 };

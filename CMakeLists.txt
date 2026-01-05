@@ -1,13 +1,19 @@
 cmake_minimum_required(VERSION 3.10)
-project(boost_task_scheduler)
+project(boost_task_scheduler LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(task_scheduler
-    src/main.cpp
-    src/task_scheduler.cpp
+find_package(Boost REQUIRED COMPONENTS system thread)
+find_library(RDKAFKA_LIBRARY rdkafka REQUIRED)
+
+add_executable(kafka_consumer
+    src/kafka/kafka_consumer.cpp
+    src/scheduler/task_scheduler.cpp
 )
 
-target_include_directories(task_scheduler PRIVATE src)
-target_link_libraries(task_scheduler PRIVATE pthread)
+target_include_directories(kafka_consumer PRIVATE src)
+
+target_link_libraries(kafka_consumer
+    PRIVATE Boost::system Boost::thread ${RDKAFKA_LIBRARY}
+)

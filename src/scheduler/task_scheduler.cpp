@@ -1,56 +1,45 @@
-#include "task_scheduler.hpp"
-#include <iostream>
+#include "scheduler/task_scheduler.hpp"
 
+TaskScheduler::TaskScheduler(std::size_t threads,
+                             std::size_t max_tasks)
+    : work_guard_(boost::asio::make_work_guard(io_)),
+      max_tasks_(max_tasks),
+      in_flight_(0)
+{
+    // Start puli wątków
+    for (std::size_t i = 0; i < threads; ++i) {
+        threads_.emplace_back([this] {
+            io_.run();
+        });
+    }
+}
 
-TaskScheduler::TaskScheduler(std::size_t thread_count):
-    work_guard_(boost::asio::make_work_guard(io_))
-    {
-        // Zostaja uruchomione watki, ktore beda wolac io_.run()
-        for(std::size_t i = 0; i < thread_count; i++){
-            threads_.emplace_back([this]{
-                io_.run();
+TaskScheduler::~TaskScheduler() {
+    // Zatrzymanie event loop i wątków
+    work_guard_.reset();
+    for (auto& t : threads_) {
+        if (t.joinable())
+            t.join();
+    }
+}
+
+bool TaskScheduler::try_submit(std::function<void()> task) {
+    std::size_t current = in_flight_.load();
+
+    // CAS: próbujemy zarezerwować slot
+    while (current < max_tasks_) {
+        if (in_flight_.compare_exchange_weak(current, current + 1)) {
+            boost::asio::post(io_, [this, task = std::move(task)] {
+                task();          // wykonanie taska
+                in_flight_--;    // zwolnienie slotu
             });
+            return true;
         }
     }
+    // Brak miejsca → backpressure
+    return false;
+}
 
-    TaskScheduler::~TaskScheduler(){
-        // Przekazujemy, ze 'wiecej pracy nie bedzie'
-        work_guard_.reset();
-
-        //Czekamy az watki sie skoncza
-        for(auto& t : threads_){
-            if(t.joinable())
-                t.join();
-        }
-    }
-
-    
-    void TaskScheduler::submit(std::function<void()> task){
-        boost::asio::post(io_, std::move(task));
-    }
-
-    void TaskScheduler::schedule_after(std::chrono::milliseconds delay, std::function<void()> task)
-    {
-        // Timer MUSI KONIECZNIE zyc do momentu odpalenia handlera
-        auto timer = std::make_shared<boost::asio::steady_timer>(io_, delay);
-
-        timer->async_wait(
-            [task = std::move(task), timer]
-            (const boost::system::error_code& ec)
-            {
-                if(!ec){
-                    task();
-                }
-            }
-        );
-    }
-
-  void TaskScheduler::wait(){
-        // Koniec przyjmowania pracy
-        work_guard_.reset();
-
-        for(auto& t : threads_){
-            if(t.joinable())
-                t.join();
-        }
-    }
+std::size_t TaskScheduler::in_flight() const {
+    return in_flight_.load();
+}

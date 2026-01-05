@@ -9,5 +9,5 @@ Projekt demonstruje:
 - opóźnione zadania (timers),
 - poprawny shutdown oparty o RAII.
 
----
+
 
